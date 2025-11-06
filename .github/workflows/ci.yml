@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to DJL ECR (public)
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registries: ${{ secrets.DJL_BASE_REGISTRY || '763104351884' }}
+          skip-logout: true
+      
+      - name: Build Docker image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg DJL_BASE_REGISTRY="${DJL_BASE_REGISTRY:-763104351884}" \
+            --build-arg AWS_REGION="${AWS_REGION:-ap-northeast-2}" \
+            --load \
+            -t test-image \
+            -f Dockerfile .
+      
+      - name: Verify image
+        run: |
+          docker inspect test-image
+
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install flake8 black mypy
+      
+      - name: Lint with flake8
+        run: |
+          flake8 code/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 code/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Check formatting with black
+        run: |
+          black --check code/
+      
+      - name: Type check with mypy
+        run: |
+          mypy code/ || true  # Optional
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check shell scripts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh || true
+      
+      - name: Verify scripts are executable
+        run: |
+          for script in scripts/*.sh; do
+            [ -x "$script" ] || echo "Warning: $script is not executable"
+          done

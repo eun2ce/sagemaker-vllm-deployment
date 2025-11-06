@@ -1,0 +1,50 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-2' }}
+      
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registries: ${{ secrets.AWS_ACCOUNT_ID }},${{ secrets.DJL_BASE_REGISTRY || '763104351884' }}
+      
+      - name: Set image tag
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="latest"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+      
+      - name: Build and push
+        env:
+          DJL_BASE_REGISTRY: ${{ secrets.DJL_BASE_REGISTRY || '763104351884' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'ap-northeast-2' }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg DJL_BASE_REGISTRY="${DJL_BASE_REGISTRY}" \
+            --build-arg AWS_REGION="${AWS_REGION}" \
+            --push \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }} \
+            -f Dockerfile .
