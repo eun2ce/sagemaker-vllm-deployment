@@ -23,25 +23,58 @@ Deploy any HuggingFace LLM to AWS SageMaker with vLLM acceleration. Solves Docke
 
 ## Quick Start
 
-# 1) Create .env file
-cd sagemaker-deployment
-cp .env.example .env
-# Edit .env with your actual values
+### 1) Create .env file
 
-# 2) Grant execution permissions to scripts
+```bash
+cp .env.example .env # Edit .env with your actual values
+```
+
+### 2) Configure model settings
+
+Edit `code/serving.properties` to set your model:
+
+```
+# Set your HuggingFace model ID
+option.model_id=Qwen/Qwen3-4B-Instruct-2507
+
+# For text generation (default)
+option.task=text-generation
+
+# For embedding models
+# option.task=embedding
+
+# Set instance type
+instance_type=ml.g5.xlarge
+# For g6e.xlarge: instance_type=ml.g6e.xlarge 
+```
+
+**Important:** Replace `your-model-id` with your actual HuggingFace model ID before building the Docker image.
+
+### 3) Grant execution permissions to scripts
+
+```bash
 chmod +x scripts/*.sh
+```
 
-# 3) Build and push image
+### 4) Build and push image
+
+```bash
 ./scripts/build-and-push-image.sh
+```
 
-# 4) Deploy endpoint (use Image URI from build-and-push-image.sh output)
+### 5) Deploy endpoint (use Image URI from build-and-push-image.sh output)
+
+```bash
 ./scripts/deploy-endpoint.sh <ECR_IMAGE_URI>
+```
 
-# 5) Test endpoint
+### 6) Test endpoint
+
+```bash
 ./scripts/test-endpoint.sh
 # Or with custom input
 SYSTEM="You are a coding assistant." USER="Write Python hello world." ./scripts/test-endpoint.sh
-
+```
 
 ## GitHub Actions CI/CD Setup
 
